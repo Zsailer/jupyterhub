@@ -60,6 +60,7 @@ from traitlets import (
 from traitlets.config import Application, Configurable, catch_config_error
 
 from jupyter_telemetry.eventlog import EventLog
+from .events.server_actions import JupyterHubServerEvents
 
 here = os.path.dirname(__file__)
 
@@ -1176,6 +1177,13 @@ class JupyterHub(Application):
         logger.parent = self.log
         logger.setLevel(self.log.level)
 
+    def init_eventlog(self):
+        # Initialize the Eventlog 
+        self.eventlog = EventLog(parent=self)
+        
+        # Register events
+        self.eventlog.register_event_model(JupyterHubServerEvents)
+
     @staticmethod
     def add_url_prefix(prefix, handlers):
         """add a url prefix to handlers"""
@@ -2128,14 +2136,7 @@ class JupyterHub(Application):
         _log_cls("Authenticator", self.authenticator_class)
         _log_cls("Spawner", self.spawner_class)
 
-        self.eventlog = EventLog(parent=self)
-
-        for dirname, _, files in os.walk(os.path.join(here, 'event-schemas')):
-            for file in files:
-                if not file.endswith('.yaml'):
-                    continue
-                self.eventlog.register_schema_file(os.path.join(dirname, file))
-
+        self.init_eventlog()
         self.init_pycurl()
         self.init_secrets()
         self.init_internal_ssl()
