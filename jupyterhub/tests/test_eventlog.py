@@ -35,7 +35,6 @@ invalid_events = [
 def get_hub_and_sink():
     """Get a hub instance with all registered schemas and record an event with it."""
     # Get a mockhub.
-    hub = MockHub.instance()
     sink =  io.StringIO()
     handler = logging.StreamHandler(sink)
 
@@ -46,22 +45,21 @@ def get_hub_and_sink():
         cfg.EventLog.allowed_schemas = [schema]
 
         # Get hub app.
-        hub.update_config(cfg)
-        hub.init_eventlog()
-
+        hub = MockHub.instance(config=cfg)
         # Record an event from the hub.
         return hub, sink
 
     yield _get_hub_and_sink
     
     # teardown
-    hub.clear_instance()
+    MockHub.clear_instance()
     handler.flush()
 
 
 @pytest.mark.parametrize('schema, version, event', valid_events)
-def test_valid_events(get_hub_and_sink, schema, version, event):
+async def test_valid_events(get_hub_and_sink, schema, version, event):
     hub, sink = get_hub_and_sink(schema)
+    await hub.initialize([])
     # Record event.
     hub.eventlog.record_event(schema, version, event)
     # Inspect consumed event.
@@ -71,8 +69,9 @@ def test_valid_events(get_hub_and_sink, schema, version, event):
     assert data is not None
 
 @pytest.mark.parametrize('schema, version, event', invalid_events)
-def test_invalid_events(get_hub_and_sink, schema, version, event):
+async def test_invalid_events(get_hub_and_sink, schema, version, event):
     hub, sink = get_hub_and_sink(schema)
+    await hub.initialize([])
     
     # Make sure an error is thrown when bad events are recorded.
     with pytest.raises(jsonschema.ValidationError):
