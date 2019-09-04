@@ -84,7 +84,7 @@ async def test_init_tokens(request):
         ssl_enabled = getattr(request.module, "ssl_enabled", False)
         if ssl_enabled:
             kwargs['internal_certs_location'] = td
-        app = MockHub(**kwargs)
+        app = MockHub.instance(**kwargs)
         await app.initialize([])
         db = app.db
         for token, username in tokens.items():
@@ -94,7 +94,7 @@ async def test_init_tokens(request):
             assert user.name == username
 
         # simulate second startup, reloading same tokens:
-        app = MockHub(**kwargs)
+        app = MockHub.instance(**kwargs)
         await app.initialize([])
         db = app.db
         for token, username in tokens.items():
@@ -105,7 +105,7 @@ async def test_init_tokens(request):
 
         # don't allow failed token insertion to create users:
         tokens['short'] = 'gman'
-        app = MockHub(**kwargs)
+        app = MockHub.instance(**kwargs)
         with pytest.raises(ValueError):
             await app.initialize([])
         assert orm.User.find(app.db, 'gman') is None
@@ -117,7 +117,7 @@ def test_write_cookie_secret(tmpdir, request):
     ssl_enabled = getattr(request.module, "ssl_enabled", False)
     if ssl_enabled:
         kwargs['internal_certs_location'] = str(tmpdir)
-    hub = MockHub(**kwargs)
+    hub = MockHub.instance(**kwargs)
     hub.init_secrets()
     assert os.path.exists(secret_path)
     assert os.stat(secret_path).st_mode & 0o600
@@ -133,7 +133,7 @@ def test_cookie_secret_permissions(tmpdir, request):
     ssl_enabled = getattr(request.module, "ssl_enabled", False)
     if ssl_enabled:
         kwargs['internal_certs_location'] = str(tmpdir)
-    hub = MockHub(**kwargs)
+    hub = MockHub.instance(**kwargs)
 
     # raise with public secret file
     os.chmod(secret_path, 0o664)
@@ -155,7 +155,7 @@ def test_cookie_secret_content(tmpdir, request):
     ssl_enabled = getattr(request.module, "ssl_enabled", False)
     if ssl_enabled:
         kwargs['internal_certs_location'] = str(tmpdir)
-    hub = MockHub(**kwargs)
+    hub = MockHub.instance(**kwargs)
     with pytest.raises(SystemExit):
         hub.init_secrets()
 
@@ -165,7 +165,7 @@ def test_cookie_secret_env(tmpdir, request):
     ssl_enabled = getattr(request.module, "ssl_enabled", False)
     if ssl_enabled:
         kwargs['internal_certs_location'] = str(tmpdir)
-    hub = MockHub(**kwargs)
+    hub = MockHub.instance(**kwargs)
 
     with patch.dict(os.environ, {'JPY_COOKIE_SECRET': 'not hex'}):
         with pytest.raises(ValueError):
@@ -186,7 +186,7 @@ async def test_load_groups(tmpdir, request):
     ssl_enabled = getattr(request.module, "ssl_enabled", False)
     if ssl_enabled:
         kwargs['internal_certs_location'] = str(tmpdir)
-    hub = MockHub(**kwargs)
+    hub = MockHub.instance(**kwargs)
     hub.init_db()
     await hub.init_users()
     await hub.init_groups()
@@ -216,7 +216,7 @@ async def test_resume_spawners(tmpdir, request):
         ssl_enabled = getattr(request.module, "ssl_enabled", False)
         if ssl_enabled:
             kwargs['internal_certs_location'] = str(tmpdir)
-        app = MockHub(test_clean_db=False, **kwargs)
+        app = MockHub.instance(test_clean_db=False, **kwargs)
         app.config.ConfigurableHTTPProxy.should_start = False
         app.config.ConfigurableHTTPProxy.auth_token = 'unused'
         await app.initialize([])
