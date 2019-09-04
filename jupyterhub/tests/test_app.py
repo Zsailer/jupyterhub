@@ -18,7 +18,7 @@ from .. import orm
 from ..app import COOKIE_SECRET_BYTES
 from ..app import JupyterHub
 from .mocking import MockHub
-from .test_api import add_user
+from .utils import add_user
 
 
 def test_help_all():
@@ -92,6 +92,7 @@ async def test_init_tokens(request):
             assert api_token is not None
             user = api_token.user
             assert user.name == username
+        app.clear_instance()
 
         # simulate second startup, reloading same tokens:
         app = MockHub.instance(**kwargs)
@@ -102,6 +103,7 @@ async def test_init_tokens(request):
             assert api_token is not None
             user = api_token.user
             assert user.name == username
+        app.clear_instance()
 
         # don't allow failed token insertion to create users:
         tokens['short'] = 'gman'
@@ -109,7 +111,7 @@ async def test_init_tokens(request):
         with pytest.raises(ValueError):
             await app.initialize([])
         assert orm.User.find(app.db, 'gman') is None
-
+        app.clear_instance()
 
 def test_write_cookie_secret(tmpdir, request):
     secret_path = str(tmpdir.join('cookie_secret'))
@@ -122,7 +124,7 @@ def test_write_cookie_secret(tmpdir, request):
     assert os.path.exists(secret_path)
     assert os.stat(secret_path).st_mode & 0o600
     assert not os.stat(secret_path).st_mode & 0o177
-
+    hub.clear_instance()
 
 def test_cookie_secret_permissions(tmpdir, request):
     secret_file = tmpdir.join('cookie_secret')
@@ -134,7 +136,6 @@ def test_cookie_secret_permissions(tmpdir, request):
     if ssl_enabled:
         kwargs['internal_certs_location'] = str(tmpdir)
     hub = MockHub.instance(**kwargs)
-
     # raise with public secret file
     os.chmod(secret_path, 0o664)
     with pytest.raises(SystemExit):
@@ -144,7 +145,7 @@ def test_cookie_secret_permissions(tmpdir, request):
     os.chmod(secret_path, 0o660)
     hub.init_secrets()
     assert hub.cookie_secret == secret
-
+    hub.clear_instance()
 
 def test_cookie_secret_content(tmpdir, request):
     secret_file = tmpdir.join('cookie_secret')
@@ -158,7 +159,7 @@ def test_cookie_secret_content(tmpdir, request):
     hub = MockHub.instance(**kwargs)
     with pytest.raises(SystemExit):
         hub.init_secrets()
-
+    hub.clear_instance()
 
 def test_cookie_secret_env(tmpdir, request):
     kwargs = {'cookie_secret_file': str(tmpdir.join('cookie_secret'))}
@@ -175,7 +176,7 @@ def test_cookie_secret_env(tmpdir, request):
         hub.init_secrets()
     assert hub.cookie_secret == binascii.a2b_hex('abc123')
     assert not os.path.exists(hub.cookie_secret_file)
-
+    hub.clear_instance()
 
 async def test_load_groups(tmpdir, request):
     to_load = {
@@ -197,7 +198,7 @@ async def test_load_groups(tmpdir, request):
     gold = orm.Group.find(db, name='gold')
     assert gold is not None
     assert sorted([u.name for u in gold.users]) == sorted(to_load['gold'])
-
+    hub.clear_instance()
 
 async def test_resume_spawners(tmpdir, request):
     if not os.getenv('JUPYTERHUB_TEST_DB_URL'):
@@ -237,7 +238,7 @@ async def test_resume_spawners(tmpdir, request):
 
     # proc is still running
     assert proc.poll() is None
-
+    app.clear_instance()
     # resume Hub, should still be running
     app = await new_hub()
     db = app.db
@@ -248,11 +249,12 @@ async def test_resume_spawners(tmpdir, request):
     # stop the Hub without cleaning up servers
     app.cleanup_servers = False
     app.stop()
-
+    
     # stop the server while the Hub is down. BAMF!
     proc.terminate()
     proc.wait(timeout=10)
     assert proc.poll() is not None
+    app.clear_instance()
 
     # resume Hub, should be stopped
     app = await new_hub()
@@ -261,7 +263,7 @@ async def test_resume_spawners(tmpdir, request):
     assert not user.running
     assert user.spawner.server is None
     assert list(db.query(orm.Server)) == []
-
+    app.clear_instance()
 
 @pytest.mark.parametrize(
     'hub_config, expected',
